@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-PULSES_OFFSET = 0
+PULSES_OFFSET = 2
 
 
 def find_carrier(data, sr):
@@ -71,7 +71,7 @@ def decode(input_fn, output_fn):
     ref = 1.0 / (2*math.pi*0.99)
     r_prime = np.concatenate((np.zeros(1), analytic_sig[:-1]))
     fm_demod = (np.angle(np.conj(r_prime) * analytic_sig)) * ref * sr
-    fm_demod = sig.medfilt(fm_demod, 9)
+    fm_demod = sig.medfilt(fm_demod, 3)
 
     def tres_f(x): return 255 * (x - f1) / (f2 - f1)
 
@@ -102,18 +102,18 @@ def decode(input_fn, output_fn):
 
 
 file_names = glob.glob('recordings/*')
-out_names = []
 
 for fn in sorted(file_names):
     out_name = os.path.join("images", os.path.splitext(
         os.path.basename(fn))[0] + ".png").replace(' ', '_')
 
-    out_names.append(out_name)
-
     if not os.path.exists(out_name):
         print('Decoding file: {}'.format(fn))
         decode(fn, out_name)
 
-for i, fn in enumerate(out_names):
-    print("![img_{}]({})".format(i+1, fn))
-    print('')
+file_names = glob.glob('images/*')
+
+for i, fn in enumerate(sorted(file_names)):
+    if not 'websdr.png' in fn:
+        print("![img_{}]({})".format(i+1, fn))
+        print('')
