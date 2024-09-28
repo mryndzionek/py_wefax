@@ -132,9 +132,13 @@ def decode(input_fn, output_fn):
     fm_demod = sig.filtfilt(taps, 1.0, fm_demod)
 
     def tres_f(x):
-        return 255 * (x - f1) / (f2 - f1)
-
-    bytestream = np.round(np.clip(tres_f(fm_demod), 0, 255)).astype(np.uint8)
+        if abs(x - f1) > abs(x - f2):
+            return 255
+        else:
+            return 0
+        
+    fm_demod = np.array(list(map(tres_f, fm_demod)))
+    bytestream = np.round(fm_demod).astype(np.uint8)
 
     head = bytestream[
         ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + 29) * sr
