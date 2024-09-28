@@ -6,6 +6,7 @@ import numpy as np
 import scipy.signal as sig
 import scipy.io.wavfile as wv
 from scipy.fft import fft
+from scipy import ndimage
 
 import matplotlib.pyplot as plt
 from PIL import Image
@@ -88,7 +89,7 @@ def find_phase_and_period(data, sr, plot=False):
         plt.grid(True)
         plt.show()
 
-    return per, phase, pk
+    return per, phase
 
 
 def deslant(data, line_len, offset):
@@ -116,7 +117,7 @@ def decode(input_fn, output_fn):
     samples = sig.filtfilt(taps, 1.0, samples)
 
     f1, f2 = find_carrier(
-        samples[ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + 29) * sr], sr
+        samples[ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC) * sr], sr
     )
 
     print("Samplerate: {}Hz".format(sr))
@@ -141,13 +142,12 @@ def decode(input_fn, output_fn):
     bytestream = np.round(fm_demod).astype(np.uint8)
 
     head = bytestream[
-        ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + 29) * sr
+        ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC) * sr
     ].astype(np.float32)
 
-    per, phase, pk = find_phase_and_period(head, sr)
+    _, phase = find_phase_and_period(head, sr)
     offset = round(phase)
 
-    bytestream = bytestream[(ANALYSIS_WIN_START_SEC + 10) * sr :]
     img_data = deslant(bytestream, (sr / 2), offset)
 
     im = Image.fromarray(img_data)
