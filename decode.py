@@ -72,6 +72,9 @@ def find_phase_and_period(data, sr, plot=False):
     if phase > per:
         phase -= per
 
+    print(f"Sync pulse period: {100 * per/sr:.2f}ms")
+    print(f"Sync pulse phase: {100 * phase/sr:.2f}ms")
+
     if plot:
         plt.plot(sync_sig)
         plt.plot(
@@ -117,12 +120,17 @@ def decode(input_fn, output_fn):
     samples = sig.filtfilt(taps, 1.0, samples)
 
     f1, f2 = find_carrier(
-        samples[ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC) * sr], sr
+        samples[
+            ANALYSIS_WIN_START_SEC
+            * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC)
+            * sr
+        ],
+        sr,
     )
 
-    print("Samplerate: {}Hz".format(sr))
-    print("Carrier freqs: {}Hz - {}Hz".format(f1, f2))
-    print("Freq offset: {}Hz".format(f2 - f1))
+    print(f"Samplerate: {sr}Hz")
+    print(f"Carrier freqs: {f1:.2f}Hz - {f2:.2f}Hz")
+    print(f"Freq offset: {f2 - f1:.2f}Hz")
 
     analytic_sig = sig.hilbert(samples)
     ref = 1.0 / (2 * math.pi * 0.99)
@@ -137,12 +145,14 @@ def decode(input_fn, output_fn):
             return 255
         else:
             return 0
-        
+
     fm_demod = np.array(list(map(tres_f, fm_demod)))
     bytestream = np.round(fm_demod).astype(np.uint8)
 
     head = bytestream[
-        ANALYSIS_WIN_START_SEC * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC) * sr
+        ANALYSIS_WIN_START_SEC
+        * sr : (ANALYSIS_WIN_START_SEC + ANALYSIS_WIN_LEN_SEC)
+        * sr
     ].astype(np.float32)
 
     _, phase = find_phase_and_period(head, sr)
