@@ -20,7 +20,9 @@ def find_carrier(data, sr, plot=False):
     f, t, fft = sig.stft(data, fs=sr)
     Y = np.max(np.abs(fft), axis=-1)
 
-    pk = sig.find_peaks(Y, height=0.5, distance=10)[0]
+    pk = sig.find_peaks(
+        Y, height=np.min(Y) + 0.8 * (np.max(Y) - np.min(Y)), distance=10
+    )[0]
     Yi = Y[pk]
     Xi = f[pk]
 
@@ -66,14 +68,17 @@ def find_phase_and_period(data, sr, plot=False):
     pk = sig.find_peaks(sync_sig, height=5, distance=round(sr * 0.475) // 2)[0]
     avgpk = np.average(sync_sig[pk])
 
-    A = np.vstack([np.arange(len(pk)), np.ones(len(pk))]).T
-    per, phase = np.linalg.lstsq(A, pk, rcond=None)[0]
+    per = round(0.5 * sr)
+
+    A = np.array([np.ones(len(pk))]).T
+    b = pk - (np.arange(len(pk)) * per)
+    phase = np.linalg.lstsq(A, b, rcond=None)[0][0]
 
     if phase > per:
         phase -= per
 
-    print(f"Sync pulse period: {100 * per/sr:.2f}ms")
-    print(f"Sync pulse phase: {100 * phase/sr:.2f}ms")
+    print(f"Sync pulse period: {1000 * per/sr:.2f}ms")
+    print(f"Sync pulse phase: {1000 * phase/sr:.2f}ms")
 
     if plot:
         plt.plot(sync_sig)
@@ -137,7 +142,7 @@ def decode(input_fn, output_fn):
     r_prime = np.concatenate((np.zeros(1), analytic_sig[:-1]))
     fm_demod = (np.angle(np.conj(r_prime) * analytic_sig)) * ref * sr
 
-    taps = sig.firwin(300, sr * 0.06, fs=sr)
+    taps = sig.firwin(300, sr * 0.1, fs=sr)
     fm_demod = sig.filtfilt(taps, 1.0, fm_demod)
 
     def tres_f(x):
@@ -156,9 +161,8 @@ def decode(input_fn, output_fn):
     ].astype(np.float32)
 
     _, phase = find_phase_and_period(head, sr)
-    offset = round(phase)
 
-    img_data = deslant(bytestream, (sr / 2), offset)
+    img_data = deslant(bytestream, (sr / 2), phase)
 
     im = Image.fromarray(img_data)
     im = im.resize((img_data.shape[0], img_data.shape[0]), Image.Resampling.LANCZOS)
