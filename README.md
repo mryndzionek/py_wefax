@@ -1,8 +1,8 @@
 # Decoding Weatherfax in Python
 
 A Python script decoding USB radio signals recorded as WAV files
-to images. The recordings need to start with at least
-10s of synchronization pulses.
+to images. The recordings need to start with synchronization pulses.
+The analysis window can be set using `ANALYSIS_WIN_START_SEC` and `ANALYSIS_WIN_LEN_SEC`.
  
 ![websdr_settings](images/websdr.png)
 
