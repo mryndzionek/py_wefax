@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-ANALYSIS_WIN_START_SEC = 7
+ANALYSIS_WIN_START_SEC = 0
 ANALYSIS_WIN_LEN_SEC = 29
 
 
@@ -21,7 +21,7 @@ def find_carrier(data, sr, plot=False):
     Y = np.max(np.abs(fft), axis=-1)
 
     pk = sig.find_peaks(
-        Y, height=np.min(Y) + 0.8 * (np.max(Y) - np.min(Y)), distance=10
+        Y, height=np.min(Y) + 0.2 * (np.max(Y) - np.min(Y)), distance=5
     )[0]
     Yi = Y[pk]
     Xi = f[pk]
@@ -55,7 +55,7 @@ def find_carrier(data, sr, plot=False):
     return sorted(Xi[si])
 
 
-def find_phase_and_period(data, sr, plot=False):
+def find_phase(data, sr, plot=False):
     k = np.concatenate(
         (
             np.zeros(round(sr * 0.475)),
@@ -64,40 +64,35 @@ def find_phase_and_period(data, sr, plot=False):
         )
     )
     sync_sig = sig.correlate(sig.medfilt(data, 201), k / len(k))
-
-    pk = sig.find_peaks(sync_sig, height=5, distance=round(sr * 0.475) // 2)[0]
-    avgpk = np.average(sync_sig[pk])
-
     per = round(0.5 * sr)
+    pk = sig.find_peaks(sync_sig, height=1, distance=per)[0]
 
-    A = np.array([np.ones(len(pk))]).T
-    b = pk - (np.arange(len(pk)) * per)
-    phase = np.linalg.lstsq(A, b, rcond=None)[0][0]
+    pk_diffs = pk[1:] - pk[:-1]
+    pk_mode = np.bincount(pk_diffs).argmax()
+    idx = np.where(pk_diffs == pk_mode)[0][-1]
+    phase = pk[idx]
+    phase_min = phase % per
 
-    if phase > per:
-        phase -= per
-
-    print(f"Sync pulse period: {1000 * per/sr:.2f}ms")
-    print(f"Sync pulse phase: {1000 * phase/sr:.2f}ms")
+    print(f"Sync pulse phase: {1000 * phase_min/sr:.2f}ms")
 
     if plot:
         plt.plot(sync_sig)
         plt.plot(
-            pk, sync_sig[pk], marker="x", linestyle="None", color="red", linewidth=5
+            pk, sync_sig[pk], marker="x", linestyle="None", color="blue", linewidth=5
         )
         plt.plot(
-            per * (np.arange(len(pk))) + phase,
-            len(pk) * [avgpk],
+            [phase_min, phase],
+            [sync_sig[phase_min], sync_sig[phase]],
             marker="o",
             mfc="none",
             linestyle="None",
             color="red",
-            linewidth=5,
+            linewidth=8,
         )
         plt.grid(True)
         plt.show()
 
-    return per, phase
+    return phase_min
 
 
 def deslant(data, line_len, offset):
@@ -160,13 +155,15 @@ def decode(input_fn, output_fn):
         * sr
     ].astype(np.float32)
 
-    _, phase = find_phase_and_period(head, sr)
+    phase = find_phase(head, sr)
+    #    phase += sr / 40
 
-    img_data = deslant(bytestream, (sr / 2), phase)
+    img_data = deslant(bytestream, (sr / 2) + 0.25, phase)
 
     im = Image.fromarray(img_data)
     im = im.resize((img_data.shape[0], img_data.shape[0]), Image.Resampling.LANCZOS)
     im.save(output_fn)
+    im.show()
 
 
 file_names = glob.glob("recordings/*")
