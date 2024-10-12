@@ -111,7 +111,7 @@ def deslant(data, line_len, offset):
     return np.asarray(img_data)
 
 
-def decode(input_fn, output_fn):
+def decode(input_fn, output_fn, aggressive_filt=False):
     sr, samples = wv.read(input_fn)
     samples = samples.astype(np.float32) / np.iinfo(type(samples[0])).max
     samples = 4 * samples[0 : sr * (len(samples) // sr)]
@@ -131,6 +131,11 @@ def decode(input_fn, output_fn):
     print(f"Samplerate: {sr}Hz")
     print(f"Carrier freqs: {f1:.2f}Hz - {f2:.2f}Hz")
     print(f"Freq offset: {f2 - f1:.2f}Hz")
+
+    if aggressive_filt:
+        ff1 = sig.iirpeak(f1, 1.5, fs=sr)
+        ff2 = sig.iirpeak(f2, 1.5, fs=sr)
+        samples = sig.filtfilt(*ff1, samples) + sig.filtfilt(*ff2, samples)
 
     analytic_sig = sig.hilbert(samples)
     ref = 1.0 / (2 * math.pi * 0.99)
@@ -156,7 +161,6 @@ def decode(input_fn, output_fn):
     ].astype(np.float32)
 
     phase = find_phase(head, sr)
-    #    phase += sr / 40
 
     img_data = deslant(bytestream, (sr / 2) + 0.25, phase)
 
