@@ -64,16 +64,32 @@ def find_phase(data, sr, plot=False):
         )
     )
     sync_sig = sig.correlate(sig.medfilt(data, 201), k / len(k))
-    per = round(0.5 * sr)
+    per = round(sr / 2)
     pk = sig.find_peaks(sync_sig, height=1, distance=per)[0]
 
     pk_diffs = pk[1:] - pk[:-1]
-    pk_mode = np.bincount(pk_diffs).argmax()
-    idx = np.where(pk_diffs == pk_mode)[0][-1]
+    pk_bincount = np.bincount(pk_diffs)
+    period_peak = pk_bincount.argmax()
+
+    period_flt = []
+    b_count = 0
+    i = period_peak
+    while pk_bincount[i] > 0:
+        period_flt.append(i)
+        b_count += pk_bincount[i]
+        i += 1
+    i = period_peak - 1
+    while pk_bincount[i] > 0:
+        period_flt.append(i)
+        b_count += pk_bincount[i]
+        i -= 1
+
+    slant = (np.max(period_flt) - np.min(period_flt)) / b_count
+    period = np.mean(period_flt)
+
+    idx = np.where(pk_diffs == round(period))[0][-1]
     phase = pk[idx]
     phase_min = phase % per
-
-    print(f"Sync pulse phase: {1000 * phase_min/sr:.2f}ms")
 
     if plot:
         plt.plot(sync_sig)
@@ -92,7 +108,7 @@ def find_phase(data, sr, plot=False):
         plt.grid(True)
         plt.show()
 
-    return phase_min
+    return phase_min, period, slant
 
 
 def deslant(data, line_len, offset):
@@ -160,14 +176,17 @@ def decode(input_fn, output_fn, aggressive_filt=False):
         * sr
     ].astype(np.float32)
 
-    phase = find_phase(head, sr)
+    phase, period, slant = find_phase(head, sr)
+    print(f"Sync pulse phase: {1000 * phase/sr:.2f}ms")
+    print(f"Sync pulse period: {1000 * period/sr:.2f}ms")
+    print(f"Slant: {slant}")
 
-    img_data = deslant(bytestream, (sr / 2) + 0.25, phase)
+    img_data = deslant(bytestream, (sr / 2) + slant, phase)
 
     im = Image.fromarray(img_data)
     im = im.resize((img_data.shape[0], img_data.shape[0]), Image.Resampling.LANCZOS)
     im.save(output_fn)
-    im.show()
+    # im.show()
 
 
 file_names = glob.glob("recordings/*")
